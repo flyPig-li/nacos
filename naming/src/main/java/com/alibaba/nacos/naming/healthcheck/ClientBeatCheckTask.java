@@ -73,6 +73,12 @@ public class ClientBeatCheckTask implements Runnable {
         return KeyBuilder.buildServiceMetaKey(service.getNamespaceId(), service.getName());
     }
 
+    /**
+     *  心跳检查线程，心跳检查逻辑：
+     *  1、如果客户端实例超过15秒还没有发送心跳过来，则将实例健康状态改成false
+     *  2、如果客户端实例超过30秒还没有发送心跳过来，则剔除该实例
+     *
+     **/
     @Override
     public void run() {
         try {
@@ -89,6 +95,7 @@ public class ClientBeatCheckTask implements Runnable {
             // first set health status of instances:
             for (Instance instance : instances) {
                 //如果客户端实例超过15秒还没有发送心跳过来，则将实例健康状态改成false
+                //客户端心跳时间可以通过preserved.heart.beat.timeout配置，在nacos控制台服务实例元数据中配置，默认15秒
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getInstanceHeartBeatTimeOut()) {
                     if (!instance.isMarked()) {
                         if (instance.isHealthy()) {
@@ -116,6 +123,7 @@ public class ClientBeatCheckTask implements Runnable {
                     continue;
                 }
                 //如果客户端实例超过30秒还没有发送心跳过来，则剔除该实例
+                //客户端实例剔除超时时间可通过preserved.ip.delete.timeout配置，，在nacos控制台服务实例元数据中配置，默认30秒
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getIpDeleteTimeout()) {
                     // delete instance
                     Loggers.SRV_LOG.info("[AUTO-DELETE-IP] service: {}, ip: {}", service.getName(),

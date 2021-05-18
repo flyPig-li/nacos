@@ -105,7 +105,8 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
     @Override
     public void put(String key, Record value) throws NacosException {
         onPut(key, value);
-        //nacos-server集群同步
+        //nacos-server集群同步，注意这里同步的是nacos-client的服务注册信息，不是集群状态信息
+        //集群状态信息同步有专门的定时任务ServerStatusReporter进行同步
         distroProtocol.sync(new DistroKey(key, KeyBuilder.INSTANCE_LIST_KEY_PREFIX), DataOperation.CHANGE,
                 globalConfig.getTaskDispatchPeriod() / 2);
     }
@@ -260,11 +261,13 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
                         if (Objects.isNull(listener)) {
                             return false;
                         }
+                        //这里只是构造了一个空的service并更新到注册表，也就是说此时注册表里只是个空壳子，并没有实例信息
                         listener.onChange(KeyBuilder.buildServiceMetaKey(namespaceId, serviceName), service);
                     }
                 }
             }
 
+            //又循环一次，这次循环才是真正的将实例数据更新到注册表
             for (Map.Entry<String, Datum<Instances>> entry : datumMap.entrySet()) {
 
                 if (!listeners.containsKey(entry.getKey())) {
@@ -275,6 +278,7 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
 
                 try {
                     for (RecordListener listener : listeners.get(entry.getKey())) {
+                        //这里是真正地将从其它节点拉取的数据更新到本地注册表
                         listener.onChange(entry.getKey(), entry.getValue().value);
                     }
                 } catch (Exception e) {

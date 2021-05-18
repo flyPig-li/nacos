@@ -77,6 +77,8 @@ public class NacosNamingService implements NamingService {
         init(properties);
     }
 
+    //客户端启动进行自动注册时，NamingFactory.createNamingService(properties)方法会通过反射执行该方法，调用流程：
+    //NacosServiceRegistry.register(registration) -> namingService() …… -> NamingFactory.createNamingService(properties)
     public NacosNamingService(Properties properties) throws NacosException {
         init(properties);
     }

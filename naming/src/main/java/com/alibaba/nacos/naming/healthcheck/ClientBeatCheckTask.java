@@ -82,6 +82,7 @@ public class ClientBeatCheckTask implements Runnable {
     @Override
     public void run() {
         try {
+            //权威节点判定，根据serviceName进行取模然后得到对应的server节点，也就是说，每个客户端实例只会由固定的一台nacos-server节点进行健康检查
             if (!getDistroMapper().responsible(service.getName())) {
                 return;
             }

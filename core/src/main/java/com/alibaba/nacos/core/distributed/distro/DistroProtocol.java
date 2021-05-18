@@ -42,17 +42,17 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class DistroProtocol {
-    
+
     private final ServerMemberManager memberManager;
-    
+
     private final DistroComponentHolder distroComponentHolder;
-    
+
     private final DistroTaskEngineHolder distroTaskEngineHolder;
-    
+
     private final DistroConfig distroConfig;
-    
+
     private volatile boolean isInitialized = false;
-    
+
     public DistroProtocol(ServerMemberManager memberManager, DistroComponentHolder distroComponentHolder,
             DistroTaskEngineHolder distroTaskEngineHolder, DistroConfig distroConfig) {
         this.memberManager = memberManager;
@@ -61,41 +61,47 @@ public class DistroProtocol {
         this.distroConfig = distroConfig;
         startDistroTask();
     }
-    
+
     private void startDistroTask() {
         if (EnvUtil.getStandaloneMode()) {
             isInitialized = true;
             return;
         }
+        //开启对账任务
         startVerifyTask();
+
+        //开启 拉取集群其它节点数据任务
         startLoadTask();
     }
-    
+
     private void startLoadTask() {
         DistroCallback loadCallback = new DistroCallback() {
             @Override
             public void onSuccess() {
                 isInitialized = true;
             }
-            
+
             @Override
             public void onFailed(Throwable throwable) {
                 isInitialized = false;
             }
         };
+        //线程池提交任务，注意不是定时任务，DistroLoadDataTask线程并不会定时执行，它的执行逻辑是这样的：
+        //1、先去其它集群节点进行一次数据拉取
+        //2、如果没有拉取到，获取拉取之后与本地注册表信息还是不一致的话，才开启定时任务进行定时拉取
         GlobalExecutor.submitLoadDataTask(
                 new DistroLoadDataTask(memberManager, distroComponentHolder, distroConfig, loadCallback));
     }
-    
+
     private void startVerifyTask() {
         GlobalExecutor.schedulePartitionDataTimedSync(new DistroVerifyTask(memberManager, distroComponentHolder),
                 distroConfig.getVerifyIntervalMillis());
     }
-    
+
     public boolean isInitialized() {
         return isInitialized;
     }
-    
+
     /**
      * Start to sync by configured delay.
      *
@@ -105,7 +111,7 @@ public class DistroProtocol {
     public void sync(DistroKey distroKey, DataOperation action) {
         sync(distroKey, action, distroConfig.getSyncDelayMillis());
     }
-    
+
     /**
      * Start to sync data to all remote server.
      *
@@ -117,13 +123,16 @@ public class DistroProtocol {
             DistroKey distroKeyWithTarget = new DistroKey(distroKey.getResourceKey(), distroKey.getResourceType(),
                     each.getAddress());
             DistroDelayTask distroDelayTask = new DistroDelayTask(distroKeyWithTarget, action, delay);
+            //这句代码可以拆分成两部分来看：
+            // 1、distroTaskEngineHolder.getDelayTaskExecuteEngine() --
+            ///2、addTask(distroKeyWithTarget, distroDelayTask) -- 将任务放入tasks（map）中，tasks由上句代码创建
             distroTaskEngineHolder.getDelayTaskExecuteEngine().addTask(distroKeyWithTarget, distroDelayTask);
             if (Loggers.DISTRO.isDebugEnabled()) {
                 Loggers.DISTRO.debug("[DISTRO-SCHEDULE] {} to {}", distroKey, each.getAddress());
             }
         }
     }
-    
+
     /**
      * Query data from specified server.
      *
@@ -143,7 +152,7 @@ public class DistroProtocol {
         }
         return transportAgent.getData(distroKey, distroKey.getTargetServer());
     }
-    
+
     /**
      * Receive synced distro data, find processor to process.
      *
@@ -159,7 +168,7 @@ public class DistroProtocol {
         }
         return dataProcessor.processData(distroData);
     }
-    
+
     /**
      * Receive verify data, find processor to process.
      *
@@ -175,7 +184,7 @@ public class DistroProtocol {
         }
         return dataProcessor.processVerifyData(distroData);
     }
-    
+
     /**
      * Query data of input distro key.
      *
@@ -191,7 +200,7 @@ public class DistroProtocol {
         }
         return distroDataStorage.getDistroData(distroKey);
     }
-    
+
     /**
      * Query all datum snapshot.
      *

@@ -31,19 +31,20 @@ import java.util.List;
  * @author xiweng.yy
  */
 public class DistroVerifyTask implements Runnable {
-    
+
     private final ServerMemberManager serverMemberManager;
-    
+
     private final DistroComponentHolder distroComponentHolder;
-    
+
     public DistroVerifyTask(ServerMemberManager serverMemberManager, DistroComponentHolder distroComponentHolder) {
         this.serverMemberManager = serverMemberManager;
         this.distroComponentHolder = distroComponentHolder;
     }
-    
+
     @Override
     public void run() {
         try {
+            //获取所有nacos-server集群节点（除了自己）
             List<Member> targetServer = serverMemberManager.allMembersWithoutSelf();
             if (Loggers.DISTRO.isDebugEnabled()) {
                 Loggers.DISTRO.debug("server list is: {}", targetServer);
@@ -55,7 +56,7 @@ public class DistroVerifyTask implements Runnable {
             Loggers.DISTRO.error("[DISTRO-FAILED] verify task failed.", e);
         }
     }
-    
+
     private void verifyForDataStorage(String type, List<Member> targetServer) {
         DistroData distroData = distroComponentHolder.findDataStorage(type).getVerifyData();
         if (null == distroData) {

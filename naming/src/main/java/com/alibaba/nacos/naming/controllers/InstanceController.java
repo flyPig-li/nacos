@@ -123,7 +123,7 @@ public class InstanceController {
     @PostMapping
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public String register(HttpServletRequest request) throws Exception {
-
+        System.out.println("**************接受到注册**************");
         final String namespaceId = WebUtils
                 .optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
         final String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
@@ -455,12 +455,14 @@ public class InstanceController {
     @PutMapping("/beat")
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public ObjectNode beat(HttpServletRequest request) throws Exception {
-
+        System.out.println("**************接受到心跳**************");
         ObjectNode result = JacksonUtils.createEmptyJsonNode();
         result.put(SwitchEntry.CLIENT_BEAT_INTERVAL, switchDomain.getClientBeatInterval());
 
         String beat = WebUtils.optional(request, "beat", StringUtils.EMPTY);
         RsInfo clientBeat = null;
+        //如果beat为空，说明是轻量级心跳，为了节省网络带宽
+        // 客户端第一次都是重量级心跳，即beat不为空
         if (StringUtils.isNotBlank(beat)) {
             clientBeat = JacksonUtils.toObj(beat, RsInfo.class);
         }
@@ -485,8 +487,10 @@ public class InstanceController {
         Instance instance = serviceManager.getInstance(namespaceId, serviceName, clusterName, ip, port);
 
         //如果注册表中没有当前服务的实例，则注册
-        //场景：之前被剔除了，重新上线后会自动注册
+        //这个外侧分支对应场景：如果客户端启动时，过了5秒服务还没有成功注册，则由心跳进行注册（心跳延迟5秒执行）
         if (instance == null) {
+            //这个子分支对应的场景：服务端挂了重启后（客户端一直有心跳且不是首次，所以是轻量级心跳），返回20404错误码
+            //客户端收到20404错误码会重新发送注册请求
             if (clientBeat == null) {
                 result.put(CommonParams.CODE, NamingResponseCode.RESOURCE_NOT_FOUND);
                 return result;
@@ -507,7 +511,7 @@ public class InstanceController {
 
             serviceManager.registerInstance(namespaceId, serviceName, instance);
         }
-
+        System.out.println("实例信息：ip=" + instance.getIp() + "， 健康状态=" + instance.isHealthy() + ", 可用状态=" + instance.isEnabled());
         Service service = serviceManager.getService(namespaceId, serviceName);
 
         if (service == null) {

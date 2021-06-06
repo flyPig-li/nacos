@@ -90,7 +90,7 @@ public class ClientBeatCheckTask implements Runnable {
             if (!getSwitchDomain().isHealthCheckEnabled()) {
                 return;
             }
-            //获取当前服务的所有实例
+            //获取当前服务的所有临时实例
             List<Instance> instances = service.allIPs(true);
 
             // first set health status of instances:

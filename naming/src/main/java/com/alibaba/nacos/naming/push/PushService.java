@@ -147,6 +147,7 @@ public class PushService implements ApplicationContextAware, ApplicationListener
                     String key = getPushCacheKey(serviceName, client.getIp(), client.getAgent());
                     byte[] compressData = null;
                     Map<String, Object> data = null;
+                    //switchDomain.getDefaultPushCacheMillis()默认是10秒，即10000毫秒，不会进入这个分支，所以compressData=null
                     if (switchDomain.getDefaultPushCacheMillis() >= 20000 && cache.containsKey(key)) {
                         org.javatuples.Pair pair = (org.javatuples.Pair) cache.get(key);
                         compressData = (byte[]) (pair.getValue0());
@@ -158,6 +159,7 @@ public class PushService implements ApplicationContextAware, ApplicationListener
                     if (compressData != null) {
                         ackEntry = prepareAckEntry(client, compressData, data, lastRefTime);
                     } else {
+                        //compressData=null，所以会进入这个分支，注意prepareHostsData(client)方法
                         ackEntry = prepareAckEntry(client, prepareHostsData(client), lastRefTime);
                         if (ackEntry != null) {
                             cache.put(key, new org.javatuples.Pair<>(ackEntry.origin.getData(), ackEntry.data));

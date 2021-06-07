@@ -669,6 +669,7 @@ public class InstanceController {
 
         // now try to enable the push
         try {
+            //udpPort是服务发现是指定的
             if (udpPort > 0 && pushService.canEnablePush(agent)) {
 
                 pushService
